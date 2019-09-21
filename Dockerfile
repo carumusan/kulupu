@@ -17,6 +17,8 @@ RUN . /root/.cargo/env
 
 RUN export PATH=/root/.cargo/bin:$PATH
 
+ENV PATH /root/.cargo/bin:$PATH
+
 RUN /kulupu/scripts/init.sh
 
 # ===== SECOND STAGE ======
