@@ -5,12 +5,12 @@ WORKDIR /kulupu
 
 COPY . /kulupu
 
-RUN git submodule update --init --recursive
-
 RUN apt-get update && \
 	apt-get dist-upgrade -y && \
 	apt-get install -y cmake pkg-config libssl-dev git clang
-  
+
+RUN git submodule update --init --recursive
+
 RUN /kulupu/scripts/init.sh
 
 # ===== SECOND STAGE ======
