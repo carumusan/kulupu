@@ -11,6 +11,8 @@ RUN apt-get update && \
 
 RUN git submodule update --init --recursive
 
+RUN curl https://sh.rustup.rs -sSf | sh
+
 RUN /kulupu/scripts/init.sh
 
 # ===== SECOND STAGE ======
