@@ -11,7 +11,9 @@ RUN apt-get update && \
 
 RUN git submodule update --init --recursive
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && . $HOME/.cargo/env && export PATH=$HOME/.cargo/bin:$PATH
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y && . $HOME/.cargo/env
+
+ENV PATH $HOME/.cargo/bin:$PATH
 
 RUN /kulupu/scripts/init.sh
 
