@@ -13,13 +13,11 @@ RUN git submodule update --init --recursive
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y 
 
-RUN . /root/.cargo/env
-
-RUN export PATH=/root/.cargo/bin:$PATH
-
 ENV PATH /root/.cargo/bin:$PATH
 
 RUN /kulupu/scripts/init.sh
+
+RUN cargo build $RELEASE
 
 # ===== SECOND STAGE ======
 
