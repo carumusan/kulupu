@@ -26,6 +26,8 @@ RUN apt-get update && \
 	apt-get dist-upgrade -y && \
 	apt-get install passwd
 
+RUN useradd -m -u 1000 -U -s /bin/sh -d /kulupu kulupu
+
 RUN mkdir -p /root/.local/share && \
 	ln -s /root/.local/share /data
 
@@ -38,8 +40,6 @@ RUN ldd /usr/local/bin/kulupu && \
 # Shrinking
 RUN rm -rf /usr/lib/python* && \
 	rm -rf /usr/bin /usr/sbin /usr/share/man
-
-RUN useradd -m -u 1000 -U -s /bin/sh -d /kulupu kulupu
 
 USER kulupu
 EXPOSE 30333 9933 9944
