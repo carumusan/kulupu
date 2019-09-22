@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 use std::str::FromStr;
+use std::collections::BTreeMap;
 use substrate_client::LongestChain;
 use kulupu_runtime::{self, GenesisConfig, opaque::Block, RuntimeApi, AccountId};
 use substrate_service::{error::{Error as ServiceError}, AbstractService, Configuration, ServiceBuilder};
@@ -35,8 +36,16 @@ pub fn kulupu_inherent_data_providers(author: Option<&str>) -> Result<inherents:
 	}
 
 	if !inherent_data_providers.has_provider(&srml_anyupgrade::INHERENT_IDENTIFIER) {
+		let upgrades = BTreeMap::default();
+		// To plan a new hard fork, insert an item such as:
+		// ```
+		// 	srml_anyupgrade::Call::<kulupu_runtime::Runtime>::any(
+		//		Box::new(srml_system::Call::set_code(<wasm>).into())
+		//	).encode()
+		// ```
+
 		inherent_data_providers
-			.register_provider(srml_anyupgrade::InherentDataProvider(Default::default()))
+			.register_provider(srml_anyupgrade::InherentDataProvider((0, upgrades)))
 			.map_err(Into::into)
 			.map_err(consensus_common::Error::InherentData)?;
 	}
@@ -81,6 +90,7 @@ macro_rules! new_full_start {
 					Box::new(client.clone()),
 					client.clone(),
 					kulupu_pow::RandomXAlgorithm::new(client.clone()),
+					0,
 					inherent_data_providers.clone(),
 				)?;
 
@@ -92,7 +102,7 @@ macro_rules! new_full_start {
 }
 
 /// Builds a new service for a full client.
-pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisConfig>, author: Option<&str>)
+pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisConfig>, author: Option<&str>, threads: usize)
 	-> Result<impl AbstractService, ServiceError>
 {
 	let is_authority = config.roles.is_authority();
@@ -107,22 +117,24 @@ pub fn new_full<C: Send + Default + 'static>(config: Configuration<C, GenesisCon
 		.build()?;
 
 	if is_authority {
-		let proposer = basic_authorship::ProposerFactory {
-			client: service.client(),
-			transaction_pool: service.transaction_pool(),
-		};
+		for _ in 0..threads {
+			let proposer = basic_authorship::ProposerFactory {
+				client: service.client(),
+				transaction_pool: service.transaction_pool(),
+			};
 
-		consensus_pow::start_mine(
-			Box::new(service.client().clone()),
-			service.client(),
-			kulupu_pow::RandomXAlgorithm::new(service.client()),
-			proposer,
-			None,
-			500,
-			service.network(),
-			std::time::Duration::new(2, 0),
-			inherent_data_providers.clone(),
-		);
+			consensus_pow::start_mine(
+				Box::new(service.client().clone()),
+				service.client(),
+				kulupu_pow::RandomXAlgorithm::new(service.client()),
+				proposer,
+				None,
+				500,
+				service.network(),
+				std::time::Duration::new(2, 0),
+				inherent_data_providers.clone(),
+			);
+		}
 	}
 
 	Ok(service)
@@ -147,6 +159,7 @@ pub fn new_light<C: Send + Default + 'static>(config: Configuration<C, GenesisCo
 				Box::new(client.clone()),
 				client.clone(),
 				kulupu_pow::RandomXAlgorithm::new(client.clone()),
+				0,
 				inherent_data_providers.clone(),
 			)?;
 

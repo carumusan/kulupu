@@ -13,6 +13,10 @@ use inherents::{InherentIdentifier, InherentData, ProvideInherent,
 use inherents::ProvideInherentData;
 use codec::{Encode, Decode};
 
+pub trait IsAnyUpgradeInherent {
+	fn is_anyupgrade_inherent(&self) -> bool;
+}
+
 pub trait Trait: system::Trait {
 	/// The overarching event type.
 	type Event: From<Event> + Into<<Self as system::Trait>::Event>;
@@ -61,6 +65,38 @@ decl_module! {
 	}
 }
 
+impl<T: Trait> Module<T> {
+	pub fn is_inherent_required(data: &InherentData) -> Result<bool, InherentError> {
+		let (check_from, whitelist) = match data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
+			.map_err(|_| InherentError::Other(RuntimeString::from("Invalid anyupgrade inherent data encoding.")))?
+		{
+			Some(whitelist) => whitelist,
+			None => return Ok(false),
+		};
+
+		let current_num = UniqueSaturatedInto::<u64>::unique_saturated_into(
+			system::Module::<T>::block_number()
+		);
+		if current_num < check_from {
+			return Ok(false)
+		}
+
+		Ok(whitelist.get(&current_num).is_some())
+	}
+
+	pub fn check_inherents(has_anyupgrade_inherent: bool, data: &InherentData) -> Result<(), InherentError> {
+		if Self::is_inherent_required(&data)? {
+			if has_anyupgrade_inherent {
+				Ok(())
+			} else {
+				Err(InherentError::RequiredNotFound)
+			}
+		} else {
+			Ok(())
+		}
+	}
+}
+
 decl_event!(
 	pub enum Event {
 		AnyDone(bool),
@@ -75,12 +111,14 @@ pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"anyupgra";
 pub enum InherentError {
 	NotWhitelisted,
 	Other(RuntimeString),
+	RequiredNotFound,
 }
 
 impl IsFatalError for InherentError {
 	fn is_fatal_error(&self) -> bool {
 		match *self {
 			InherentError::NotWhitelisted => true,
+			InherentError::RequiredNotFound => true,
 			InherentError::Other(_) => true,
 		}
 	}
@@ -98,7 +136,7 @@ impl InherentError {
 	}
 }
 
-pub type InherentType = BTreeMap<u64, Vec<u8>>;
+pub type InherentType = (u64, BTreeMap<u64, Vec<u8>>);
 
 #[cfg(feature = "std")]
 pub struct InherentDataProvider(pub InherentType);
@@ -124,7 +162,7 @@ impl<T: Trait> ProvideInherent for Module<T> {
 	const INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
 
 	fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-		let whitelist = data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
+		let (_, whitelist) = data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
 			.expect("Gets and decodes anyupgrade inherent data")?;
 
 		let current_num = UniqueSaturatedInto::<u64>::unique_saturated_into(
@@ -142,16 +180,20 @@ impl<T: Trait> ProvideInherent for Module<T> {
 	}
 
 	fn check_inherent(call: &Self::Call, data: &InherentData) -> result::Result<(), Self::Error> {
-		let whitelist = match data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
+		let (check_from, whitelist) = match data.get_data::<InherentType>(&INHERENT_IDENTIFIER)
 			.map_err(|_| InherentError::Other(RuntimeString::from("Invalid anyupgrade inherent data encoding.")))?
 		{
-			Some(whitelist) => whitelist,
-			None => return Err(InherentError::NotWhitelisted),
+			Some((check_from, whitelist)) => (check_from, whitelist),
+			None => return Ok(()),
 		};
 
 		let current_num = UniqueSaturatedInto::<u64>::unique_saturated_into(
 			system::Module::<T>::block_number()
 		);
+		if current_num < check_from {
+			return Ok(())
+		}
+
 		let ccall = call.encode();
 		for (num, call) in whitelist {
 			if num == current_num && call == ccall {

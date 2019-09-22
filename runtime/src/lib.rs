@@ -1,4 +1,4 @@
-//! The Substrate Node Template runtime. This can be compiled with `#[no_std]`, ready for Wasm.
+//! The Kulupu runtime. This can be compiled with `#[no_std]`, ready for Wasm.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
@@ -13,9 +13,9 @@ mod difficulty;
 use rstd::prelude::*;
 use primitives::OpaqueMetadata;
 use sr_primitives::{
-	ApplyResult, transaction_validity::TransactionValidity, generic, create_runtime_str, AnySignature
+	ApplyResult, transaction_validity::TransactionValidity, generic, create_runtime_str, AnySignature,
 };
-use sr_primitives::traits::{NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify, ConvertInto};
+use sr_primitives::traits::{NumberFor, BlakeTwo256, Block as BlockT, Extrinsic as ExtrinsicT, StaticLookup, Verify, ConvertInto};
 use sr_primitives::weights::Weight;
 use client::{
 	block_builder::api::{CheckInherentsResult, InherentData, self as block_builder_api},
@@ -78,11 +78,11 @@ pub mod opaque {
 
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
-	authoring_version: 3,
-	spec_version: 4,
-	impl_version: 4,
+	spec_name: create_runtime_str!("kulupu"),
+	impl_name: create_runtime_str!("kulupu-substrate"),
+	authoring_version: 1,
+	spec_version: 1,
+	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 };
 
@@ -310,7 +310,37 @@ impl_runtime_apis! {
 		}
 
 		fn check_inherents(block: Block, data: InherentData) -> CheckInherentsResult {
-			data.check_extrinsics(&block)
+			let mut result = data.check_extrinsics(&block);
+
+			if result.fatal_error() {
+				return result
+			}
+
+			let mut has_anyupgrade_inherent = false;
+			for xt in block.extrinsics() {
+				if xt.is_signed().unwrap_or(false) {
+					break
+				}
+
+				match xt.function {
+					Call::AnyUpgrade(_) => { has_anyupgrade_inherent = true; }
+					_ => (),
+				}
+			}
+
+			let e = anyupgrade::Module::<Runtime>::check_inherents(
+				has_anyupgrade_inherent,
+				&data,
+			);
+
+			match e {
+				Ok(()) => result,
+				Err(e) => {
+					result.put_error(anyupgrade::INHERENT_IDENTIFIER, &e)
+						.expect("There is only one fatal error; qed");
+					result
+				},
+			}
 		}
 
 		fn random_seed() -> <Block as BlockT>::Hash {
