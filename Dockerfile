@@ -17,7 +17,7 @@ ENV PATH /root/.cargo/bin:$PATH
 
 RUN /kulupu/scripts/init.sh
 
-RUN cargo build $PROFILE
+RUN cargo build --release
 
 # ===== SECOND STAGE ======
 
