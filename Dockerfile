@@ -35,6 +35,8 @@ RUN ldd /usr/local/bin/kulupu && \
 RUN rm -rf /usr/lib/python* && \
 	rm -rf /usr/bin /usr/sbin /usr/share/man
 
+RUN useradd -m -u 1000 -U -s /bin/sh -d /kulupu kulupu
+
 USER kulupu
 EXPOSE 30333 9933 9944
 VOLUME ["/data"]
