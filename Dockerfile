@@ -6,7 +6,7 @@ COPY . /kulupu
 
 RUN apt-get update && \
 	apt-get dist-upgrade -y && \
-	apt-get install -y cmake pkg-config libssl-dev git clang
+	apt-get install -y cmake pkg-config libssl-dev git clang useradd
 
 RUN git submodule update --init --recursive
 
