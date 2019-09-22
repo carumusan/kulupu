@@ -1,6 +1,5 @@
 FROM phusion/baseimage:0.11 as builder
 
-ARG PROFILE=release
 WORKDIR /kulupu
 
 COPY . /kulupu
@@ -22,12 +21,11 @@ RUN cargo build --release
 # ===== SECOND STAGE ======
 
 FROM phusion/baseimage:0.11
-ARG PROFILE=release
 
 RUN mkdir -p /root/.local/share && \
 	ln -s /root/.local/share /data
 
-COPY --from=builder /kulupu/target/$PROFILE/kulupu /usr/local/bin
+COPY --from=builder /kulupu/target/release/kulupu /usr/local/bin
 
 # checks
 RUN ldd /usr/local/bin/kulupu && \
