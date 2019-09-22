@@ -6,7 +6,7 @@ COPY . /kulupu
 
 RUN apt-get update && \
 	apt-get dist-upgrade -y && \
-	apt-get install -y cmake pkg-config libssl-dev git clang useradd
+	apt-get install -y cmake pkg-config libssl-dev git clang passwd
 
 RUN git submodule update --init --recursive
 
@@ -21,6 +21,10 @@ RUN cargo build --release
 # ===== SECOND STAGE ======
 
 FROM phusion/baseimage:0.11
+
+RUN apt-get update && \
+	apt-get dist-upgrade -y && \
+	apt-get install passwd
 
 RUN mkdir -p /root/.local/share && \
 	ln -s /root/.local/share /data
