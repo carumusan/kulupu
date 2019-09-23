@@ -24,8 +24,8 @@ FROM phusion/baseimage:0.11
 
 RUN useradd -m -u 1000 -U -s /bin/sh -d /kulupu kulupu
 
-RUN mkdir -p /root/.local/share && \
-	ln -s /root/.local/share /data
+RUN mkdir -p /kulupu/.local/share && \
+	ln -s /kulupu/.local/share /data
 
 COPY --from=builder /kulupu/target/release/kulupu /usr/local/bin
 
