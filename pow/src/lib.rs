@@ -11,16 +11,17 @@ use consensus_pow::PowAlgorithm;
 use consensus_pow_primitives::{Seal as RawSeal, DifficultyApi};
 use kulupu_primitives::{Difficulty, AlgorithmApi, DAY_HEIGHT, HOUR_HEIGHT};
 use lru_cache::LruCache;
+use rand::{SeedableRng, thread_rng, rngs::SmallRng};
 use log::*;
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
 pub struct Seal {
 	pub difficulty: Difficulty,
 	pub work: H256,
 	pub nonce: H256,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug)]
 pub struct Calculation {
 	pub difficulty: Difficulty,
 	pub pre_hash: H256,
@@ -67,7 +68,7 @@ impl Compute {
 
 fn is_valid_hash(hash: &H256, difficulty: Difficulty) -> bool {
 	let num_hash = U256::from(&hash[..]);
-	let (_, overflowed) = num_hash.overflowing_mul(difficulty.0);
+	let (_, overflowed) = num_hash.overflowing_mul(difficulty);
 
 	!overflowed
 }
@@ -166,18 +167,15 @@ impl<B: BlockT<Hash=H256>, C> PowAlgorithm<B> for RandomXAlgorithm<C> where
 		&self,
 		parent: &BlockId<B>,
 		pre_hash: &H256,
-		seed: &H256,
 		difficulty: Difficulty,
 		round: u32,
 	) -> Result<Option<RawSeal>, String> {
+		let mut rng = SmallRng::from_rng(&mut thread_rng())
+			.map_err(|e| format!("Initialize RNG failed for mining: {:?}", e))?;
 		let key_hash = key_hash(self.client.as_ref(), parent)?;
 
-		for i in 0..round {
-			let nonce = {
-				let mut ret = H256::default();
-				(U256::from(&seed[..]) + U256::from(i)).to_big_endian(&mut ret[..]);
-				ret
-			};
+		for _ in 0..round {
+			let nonce = H256::random_using(&mut rng);
 
 			let compute = Compute {
 				key_hash,
@@ -199,8 +197,25 @@ impl<B: BlockT<Hash=H256>, C> PowAlgorithm<B> for RandomXAlgorithm<C> where
 
 #[cfg(test)]
 mod tests {
+	use super::*;
+	use kulupu_primitives::{H256, U256};
+
 	#[test]
 	fn randomx_len() {
 		assert_eq!(randomx::HASH_SIZE, 32);
+	}
+
+	#[test]
+	fn randomx_collision() {
+		let mut compute = Compute {
+			key_hash: H256::from([210, 164, 216, 149, 3, 68, 116, 1, 239, 110, 111, 48, 180, 102, 53, 180, 91, 84, 242, 90, 101, 12, 71, 70, 75, 83, 17, 249, 214, 253, 71, 89]),
+			pre_hash: H256::default(),
+			difficulty: U256::default(),
+			nonce: H256::default(),
+		};
+		let hash1 = compute.clone().compute();
+		U256::one().to_big_endian(&mut compute.nonce[..]);
+		let hash2 = compute.compute();
+		assert!(hash1 != hash2);
 	}
 }
