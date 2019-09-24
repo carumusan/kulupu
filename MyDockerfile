@@ -29,6 +29,8 @@ RUN mkdir -p /kulupu/.local/share && \
 
 COPY --from=builder /kulupu/target/release/kulupu /usr/local/bin
 
+RUN chown -R kulupu /kulupu
+
 # checks
 RUN ldd /usr/local/bin/kulupu && \
 	/usr/local/bin/kulupu --version
